@@ -1,0 +1,24 @@
+#######################################
+# Syntax Coloring Map for Multitask
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+CooperativeScheduler	KEYWORD1
+PreemptiveScheduler	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+create_task	KEYWORD2
+run	KEYWORD2
+read	KEYWORD2
+cmt_yeld	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
