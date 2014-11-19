@@ -9,8 +9,6 @@
 #include "EthernetClient.h"
 #include "EthernetServer.h"
 
-const IPAddress INADDR_NONE(0,0,0,0);
-
 #define CLASS_A 0x0
 #define CLASS_B 0x2
 #define CLASS_C 0x6
@@ -38,11 +36,16 @@ public:
 	void begin(IPAddress local_ip, IPAddress dns_server, IPAddress gateway);
 	void begin(IPAddress local_ip, IPAddress dns_server, IPAddress gateway, IPAddress subnet);
 
+	/* For Arduino compatibility */
+	int maintain();
+
+	/* IP Address related functions */
 	IPAddress localIP();
 	IPAddress subnetMask();
 	IPAddress gatewayIP();
 	IPAddress dnsServerIP();
 
+	/* Who is your friend? */
 	friend class EthernetClient;
 	friend class EthernetServer;
 };
