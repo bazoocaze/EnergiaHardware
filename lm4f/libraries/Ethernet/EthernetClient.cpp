@@ -77,30 +77,24 @@ err_t EthernetClient::do_poll(void *arg, struct tcp_pcb *cpcb) {
 void EthernetClient::do_err(void * arg, err_t err) {
 	EthernetClient *client = static_cast<EthernetClient*>(arg);
 
-	if (client->_connected) {
-		client->_connected = false;
-		return;
-	}
+	/* SYN sent and RST received */
 
-	/*
-	 * Set connected to true to finish connecting.
-	 * ::connect wil take care of figuring out if we are truly connected
-	 * by looking at the socket state
-	 */
-	client->_connected = true;
+	client->cs->cpcb = NULL; /* lwip: can't reference pcb anymore after do_err */
+
+	client->_connected = false;
 }
 
-err_t EthernetClient::do_connected(void * arg, struct tcp_pcb * tpcb,
-		err_t err) {
+err_t EthernetClient::do_connected(void * arg, struct tcp_pcb * tpcb, err_t err) {
 	EthernetClient *client = static_cast<EthernetClient*>(arg);
 
+	/* SYN+ACK received */
+
 	client->_connected = true;
 
-	return err;
+	return ERR_OK;
 }
 
-err_t EthernetClient::do_recv(void *arg, struct tcp_pcb *cpcb, struct pbuf *p,
-		err_t err) {
+err_t EthernetClient::do_recv(void *arg, struct tcp_pcb *cpcb, struct pbuf *p, err_t err) {
 	/*
 	 * Get the client object from the argument
 	 * to get access to variables and functions
@@ -114,15 +108,14 @@ err_t EthernetClient::do_recv(void *arg, struct tcp_pcb *cpcb, struct pbuf *p,
 	}
 
 	if (client->cs->p != 0)
-		pbuf_cat((pbuf*)client->cs->p, p);
+		pbuf_cat((pbuf*) client->cs->p, p);
 	else
 		client->cs->p = p;
 
 	return ERR_OK;
 }
 
-void EthernetClient::do_dns(const char *name, struct ip_addr *ipaddr,
-		void *arg) {
+void EthernetClient::do_dns(const char *name, struct ip_addr *ipaddr, void *arg) {
 	ip_addr_t *result = (ip_addr_t *) arg;
 
 	/* BEWARE: lwip stack has been modified to set ipaddr
@@ -146,11 +139,16 @@ int EthernetClient::connect(const char* host, uint16_t port) {
 	return (connect(IPAddress(ip.addr), port));
 }
 
+volatile int debug_flag = 0;
+
 int EthernetClient::connect(IPAddress ip, uint16_t port) {
+	INT_PROTECT_INIT(oldLevel);
 	ip_addr_t dest;
 	dest.addr = ip;
 
+	INT_PROTECT(oldLevel);
 	cs->cpcb = tcp_new();
+	INT_UNPROTECT(oldLevel);
 	cs->read = 0;
 	cs->p = NULL;
 
@@ -158,13 +156,19 @@ int EthernetClient::connect(IPAddress ip, uint16_t port) {
 		return false;
 	}
 
-	tcp_arg((tcp_pcb*)cs->cpcb, this);
-	tcp_recv((tcp_pcb*)cs->cpcb, do_recv);
-	tcp_err((tcp_pcb*)cs->cpcb, do_err);
+	tcp_arg((tcp_pcb*) cs->cpcb, this);
+	tcp_recv((tcp_pcb*) cs->cpcb, do_recv);
+	tcp_err((tcp_pcb*) cs->cpcb, do_err);
 
-	uint8_t val = tcp_connect((tcp_pcb *)cs->cpcb, &dest, port, do_connected);
+	uint8_t val = tcp_connect((tcp_pcb *) cs->cpcb, &dest, port, do_connected);
 
 	if (val != ERR_OK) {
+		INT_PROTECT(oldLevel);
+		if (cs->cpcb) {
+			tcp_close((tcp_pcb*) cs->cpcb);
+			cs->cpcb = NULL;
+		}
+		INT_UNPROTECT(oldLevel);
 		return false;
 	}
 
@@ -172,23 +176,32 @@ int EthernetClient::connect(IPAddress ip, uint16_t port) {
 	 * Abort if the connection does not succeed within 10 sec */
 	unsigned long then = millis();
 
-	while (!_connected) {
-		unsigned long now = millis();
-		delay(10);
-		if (now - then > CONNECTION_TIMEOUT) {
-			tcp_close((tcp_pcb*)cs->cpcb);
-			cs->cpcb = NULL;
-			return false;
+	while ((!_connected) && cs->cpcb) {
+		delay(1);
+		if (millis() - then > CONNECTION_TIMEOUT)
+			break;
+	}
+
+	INT_PROTECT(oldLevel);
+	if (!cs->cpcb) {
+		INT_UNPROTECT(oldLevel);
+		return false;
+	}
+	if (!_connected) {
+		if (cs->cpcb->state != CLOSED) {
+			tcp_recv((tcp_pcb*) cs->cpcb, NULL);
+			tcp_err((tcp_pcb*) cs->cpcb, NULL);
+			tcp_close((tcp_pcb*) cs->cpcb);
 		}
+		cs->cpcb = NULL;
+		INT_UNPROTECT(oldLevel);
+		return false;
 	}
-
-	if (cs->cpcb->state != ESTABLISHED) {
-		_connected = false;
-	}
-
 	/* Poll to determine if the peer is still alive */
-	tcp_poll((tcp_pcb*)cs->cpcb, do_poll, 10);
-	return _connected;
+	tcp_poll((tcp_pcb*) cs->cpcb, do_poll, 10);
+	INT_UNPROTECT(oldLevel);
+
+	return true;
 }
 
 size_t EthernetClient::write(uint8_t b) {
@@ -196,13 +209,19 @@ size_t EthernetClient::write(uint8_t b) {
 }
 
 size_t EthernetClient::write(const uint8_t *buf, size_t size) {
+	INT_PROTECT_INIT(oldLevel);
 	uint32_t i = 0, inc = 0;
 	boolean stuffed_buffer = false;
 
-	struct tcp_pcb * cpcb = (tcp_pcb*)cs->cpcb; /* cs->cpcb may change to NULL during interrupt servicing */
+	INT_PROTECT(oldLevel);
+	struct tcp_pcb * cpcb = (tcp_pcb*) cs->cpcb; /* cs->cpcb may change to NULL during interrupt servicing */
+	int ret = 0;
 
 	if (!cpcb)
+	{
+		INT_UNPROTECT(oldLevel);
 		return 0;
+	}
 
 	// Attempt to write in 1024-byte increments.
 	while (i < size) {
@@ -210,6 +229,7 @@ size_t EthernetClient::write(const uint8_t *buf, size_t size) {
 		err_t err = tcp_write(cpcb, buf + i, inc, TCP_WRITE_FLAG_COPY);
 		if (err != ERR_MEM) {
 			// Keep enqueueing the lwIP buffer until it's full...
+			ret += inc;
 			i += inc;
 			stuffed_buffer = false;
 		} else {
@@ -219,7 +239,14 @@ size_t EthernetClient::write(const uint8_t *buf, size_t size) {
 					tcp_output(cpcb);
 				stuffed_buffer = true;
 			} else {
+				ROM_IntMasterEnable();
 				delay(1); // else wait a little bit for lwIP to flush its buffers
+				ROM_IntMasterDisable();
+				if(!cs->cpcb)
+				{
+					INT_UNPROTECT(oldLevel);
+					return ret;
+				}
 			}
 		}
 	}
@@ -229,11 +256,13 @@ size_t EthernetClient::write(const uint8_t *buf, size_t size) {
 			tcp_output(cpcb);
 	}
 
-	return size;
+	INT_UNPROTECT(oldLevel);
+
+	return ret;
 }
 
 int EthernetClient::available() {
-	struct pbuf * p = (pbuf*)cs->p; /* cs->p may change to NULL during interrupt servicing */
+	struct pbuf * p = (pbuf*) cs->p; /* cs->p may change to NULL during interrupt servicing */
 	if (!p)
 		return 0;
 	return p->tot_len - cs->read;
@@ -263,22 +292,22 @@ int EthernetClient::readLocked() {
 	uint8_t b = buf[cs->read];
 	cs->read++;
 
-	tcp_recved((tcp_pcb*)cs->cpcb, cs->read);
+	tcp_recved((tcp_pcb*) cs->cpcb, cs->read);
 
 	if ((cs->read == cs->p->len) && cs->p->next) {
 		cs->read = 0;
-		struct pbuf * q = (pbuf*)cs->p;
+		struct pbuf * q = (pbuf*) cs->p;
 		cs->p = cs->p->next;
 		/* Increase ref count on p->next
 		 * 1->3->1->etc */
-		pbuf_ref((pbuf*)cs->p);
+		pbuf_ref((pbuf*) cs->p);
 		/* Free p which decreases ref count of the chain
 		 * and frees up to p->next in this case
 		 * ...->1->1->etc */
 		pbuf_free(q);
 	} else if (cs->read == cs->p->len) {
 		cs->read = 0;
-		pbuf_free((pbuf*)cs->p);
+		pbuf_free((pbuf*) cs->p);
 		cs->p = NULL;
 	}
 
@@ -335,7 +364,7 @@ void EthernetClient::flush() {
 	INT_PROTECT(oldLevel);
 	if (available()) {
 		cs->read = cs->p->tot_len;
-		tcp_recved((tcp_pcb*)cs->cpcb, 0);
+		tcp_recved((tcp_pcb*) cs->cpcb, 0);
 	}
 	INT_UNPROTECT(oldLevel);
 }
@@ -379,7 +408,7 @@ uint8_t EthernetClient::connected() {
 }
 
 uint8_t EthernetClient::status() {
-	struct tcp_pcb * cpcb = (tcp_pcb*)cs->cpcb;
+	struct tcp_pcb * cpcb = (tcp_pcb*) cs->cpcb;
 	if (cpcb == NULL)
 		return CLOSED;
 	return cpcb->state;

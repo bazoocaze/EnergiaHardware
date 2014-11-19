@@ -405,6 +405,12 @@ memp_malloc_fn(memp_t type, const char* file, const int line)
   memp = memp_tab[type];
   
   if (memp != NULL) {
+	  if(memp < 0x20000000 || memp >= 0x20040000)
+	  {
+		  /* invalid/corrupted next free memp */
+		  return NULL;
+	  }
+	  /* TODO: this generate an access fault on de-reference */
     memp_tab[type] = memp->next;
 #if MEMP_OVERFLOW_CHECK
     memp->next = NULL;
@@ -424,6 +430,8 @@ memp_malloc_fn(memp_t type, const char* file, const int line)
 
   return memp;
 }
+
+volatile int debug_internal_flag = 0;
 
 /**
  * Put an element back into its pool.
@@ -455,7 +463,31 @@ memp_free(memp_t type, void *mem)
 #endif /* MEMP_OVERFLOW_CHECK >= 2 */
 #endif /* MEMP_OVERFLOW_CHECK */
 
-  MEMP_STATS_DEC(used, type); 
+  MEMP_STATS_DEC(used, type);
+
+  if(memp < 0x20000000 || memp >= 0x20040000)
+  {
+	  /* invalid/corrupted memp */
+	  return;
+  }
+  /* scan memp linked list for a double-free */
+  struct memp * scan_ptr = memp_tab[type];
+  while(scan_ptr != NULL)
+  {
+	  if(scan_ptr == memp)
+	  {
+		  /* detected a double-free bug */
+		  if(memp->next < 0x20000000 || memp->next >= 0x20040000)
+		  {
+			  /* invalid/corrupted memp->next */
+			  debug_internal_flag = 0;
+			  return;
+		  }
+		  debug_internal_flag = 1;
+		  return;
+	  }
+	  scan_ptr = scan_ptr->next;
+  }
   
   memp->next = memp_tab[type]; 
   memp_tab[type] = memp;
