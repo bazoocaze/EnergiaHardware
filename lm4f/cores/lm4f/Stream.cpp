@@ -26,6 +26,10 @@
 #define PARSE_TIMEOUT 1000  // default number of milli-seconds to wait
 #define NO_SKIP_CHAR  1  // a magic char not found in a valid ASCII numeric field
 
+extern "C" {
+	__attribute__((weak)) void cmt_yeld();
+}
+
 // private method to read stream with timeout
 int Stream::timedRead()
 {
@@ -34,6 +38,7 @@ int Stream::timedRead()
   do {
     c = read();
     if (c >= 0) return c;
+    cmt_yeld();
   } while(millis() - _startMillis < _timeout);
   return -1;     // -1 indicates timeout
 }
@@ -46,6 +51,7 @@ int Stream::timedPeek()
   do {
     c = peek();
     if (c >= 0) return c;
+    cmt_yeld();
   } while(millis() - _startMillis < _timeout);
   return -1;     // -1 indicates timeout
 }
