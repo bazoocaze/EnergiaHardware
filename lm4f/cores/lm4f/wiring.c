@@ -35,6 +35,8 @@
 #include "driverlib/sysctl.h"
 #include "driverlib/timer.h"
 
+__attribute__((weak)) void cmt_yeld();
+
 static void (*SysTickCbFuncs[8])(uint32_t ui32TimeMS);
 
 #define SYSTICKMS               (1000 / SYSTICKHZ)
@@ -107,6 +109,7 @@ void delay(uint32_t ms)
 	unsigned long i;
 	for(i=0; i<ms; i++){
 		delayMicroseconds(1000);
+		cmt_yeld();
 	}
 }
 
