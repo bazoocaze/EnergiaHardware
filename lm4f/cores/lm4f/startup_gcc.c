@@ -95,6 +95,24 @@ __attribute__((weak)) void UARTIntHandler7(void) {}
 __attribute__((weak)) void ToneIntHandler(void) {}
 __attribute__((weak)) void I2CIntHandler(void) {}
 __attribute__((weak)) void Timer5IntHandler(void) {}
+
+
+__attribute__((weak)) void Timer0AIntHandler(void) {}
+__attribute__((weak)) void Timer0BIntHandler(void) {}
+__attribute__((weak)) void Timer1AIntHandler(void) {}
+__attribute__((weak)) void Timer1BIntHandler(void) {}
+__attribute__((weak)) void Timer2AIntHandler(void) {}
+__attribute__((weak)) void Timer2BIntHandler(void) {}
+__attribute__((weak)) void Timer3AIntHandler(void) {}
+__attribute__((weak)) void Timer3BIntHandler(void) {}
+__attribute__((weak)) void Timer4BIntHandler(void) {}
+__attribute__((weak)) void Timer5BIntHandler(void) {}
+__attribute__((weak)) void Timer6AIntHandler(void) {}
+__attribute__((weak)) void Timer6BIntHandler(void) {}
+__attribute__((weak)) void Timer7AIntHandler(void) {}
+__attribute__((weak)) void Timer7BIntHandler(void) {}
+
+
 //*****************************************************************************
 // System stack start determined by ldscript, normally highest ram address
 //*****************************************************************************
@@ -146,12 +164,12 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC Sequence 2
     IntDefaultHandler,                      // ADC Sequence 3
     IntDefaultHandler,                      // Watchdog timer
-    IntDefaultHandler,                      // Timer 0 subtimer A
-    IntDefaultHandler,                      // Timer 0 subtimer B
-    IntDefaultHandler,                      // Timer 1 subtimer A
-    IntDefaultHandler,                      // Timer 1 subtimer B
-    IntDefaultHandler,                      // Timer 2 subtimer A
-    IntDefaultHandler,                      // Timer 2 subtimer B
+    Timer0AIntHandler,                      // Timer 0 subtimer A
+    Timer0BIntHandler,                      // Timer 0 subtimer B
+    Timer1AIntHandler,                      // Timer 1 subtimer A
+    Timer1BIntHandler,                      // Timer 1 subtimer B
+    Timer2AIntHandler,                      // Timer 2 subtimer A
+    Timer2BIntHandler,                      // Timer 2 subtimer B
     IntDefaultHandler,                      // Analog Comparator 0
     IntDefaultHandler,                      // Analog Comparator 1
     IntDefaultHandler,                      // Analog Comparator 2
@@ -162,8 +180,8 @@ void (* const g_pfnVectors[])(void) =
     GPIOHIntHandler,                        // GPIO Port H
     UARTIntHandler2,                        // UART2 Rx and Tx
     IntDefaultHandler,                      // SSI1 Rx and Tx
-    IntDefaultHandler,                      // Timer 3 subtimer A
-    IntDefaultHandler,                      // Timer 3 subtimer B
+    Timer3AIntHandler,                      // Timer 3 subtimer A
+    Timer3BIntHandler,                      // Timer 3 subtimer B
     I2CIntHandler,                          // I2C1 Master and Slave
     IntDefaultHandler,                      // Quadrature Encoder 1
     IntDefaultHandler,                      // CAN0
@@ -198,7 +216,7 @@ void (* const g_pfnVectors[])(void) =
     I2CIntHandler,                          // I2C2 Master and Slave
     I2CIntHandler,                          // I2C3 Master and Slave
     ToneIntHandler,                         // Timer 4 subtimer A
-    IntDefaultHandler,                      // Timer 4 subtimer B
+    Timer4BIntHandler,                      // Timer 4 subtimer B
     0,                                      // Reserved
     0,                                      // Reserved
     0,                                      // Reserved
@@ -220,7 +238,7 @@ void (* const g_pfnVectors[])(void) =
     0,                                      // Reserved
     0,                                      // Reserved
     Timer5IntHandler,                       // Timer 5 subtimer A
-    IntDefaultHandler,                      // Timer 5 subtimer B
+    Timer5BIntHandler,                      // Timer 5 subtimer B
     IntDefaultHandler,                      // Wide Timer 0 subtimer A
     IntDefaultHandler,                      // Wide Timer 0 subtimer B
     IntDefaultHandler,                      // Wide Timer 1 subtimer A
@@ -306,12 +324,12 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // ADC Sequence 2
     IntDefaultHandler,                      // ADC Sequence 3
     IntDefaultHandler,                      // Watchdog timer
-    IntDefaultHandler,                      // Timer 0 subtimer A
-    IntDefaultHandler,                      // Timer 0 subtimer B
-    IntDefaultHandler,                      // Timer 1 subtimer A
-    IntDefaultHandler,                      // Timer 1 subtimer B
-    IntDefaultHandler,                      // Timer 2 subtimer A
-    IntDefaultHandler,                      // Timer 2 subtimer B
+    Timer0AIntHandler,                      // Timer 0 subtimer A
+    Timer0BIntHandler,                      // Timer 0 subtimer B
+    Timer1AIntHandler,                      // Timer 1 subtimer A
+    Timer1BIntHandler,                      // Timer 1 subtimer B
+    Timer2AIntHandler,                      // Timer 2 subtimer A
+    Timer2BIntHandler,                      // Timer 2 subtimer B
     IntDefaultHandler,                      // Analog Comparator 0
     IntDefaultHandler,                      // Analog Comparator 1
     IntDefaultHandler,                      // Analog Comparator 2
@@ -322,8 +340,8 @@ void (* const g_pfnVectors[])(void) =
     GPIOHIntHandler,                        // GPIO Port H
     UARTIntHandler2,                        // UART2 Rx and Tx
     IntDefaultHandler,                      // SSI1 Rx and Tx
-    IntDefaultHandler,                      // Timer 3 subtimer A
-    IntDefaultHandler,                      // Timer 3 subtimer B
+    Timer3AIntHandler,                      // Timer 3 subtimer A
+    Timer3BIntHandler,                      // Timer 3 subtimer B
     IntDefaultHandler,                      // I2C1 Master and Slave
     IntDefaultHandler,                      // CAN0
     IntDefaultHandler,                      // CAN1
@@ -351,9 +369,9 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // I2C2 Master and Slave
     IntDefaultHandler,                      // I2C3 Master and Slave
     ToneIntHandler,                         // Timer 4 subtimer A
-    IntDefaultHandler,                      // Timer 4 subtimer B
+    Timer4BIntHandler,                      // Timer 4 subtimer B
     Timer5IntHandler,                       // Timer 5 subtimer A
-    IntDefaultHandler,                      // Timer 5 subtimer B
+    Timer5BIntHandler,                      // Timer 5 subtimer B
     IntDefaultHandler,                      // FPU
     0,                                      // Reserved
     0,                                      // Reserved
@@ -385,10 +403,10 @@ void (* const g_pfnVectors[])(void) =
     IntDefaultHandler,                      // AES 0
     IntDefaultHandler,                      // DES3DES 0
     IntDefaultHandler,                      // LCD Controller 0
-    IntDefaultHandler,                      // Timer 6 subtimer A
-    IntDefaultHandler,                      // Timer 6 subtimer B
-    IntDefaultHandler,                      // Timer 7 subtimer A
-    IntDefaultHandler,                      // Timer 7 subtimer B
+    Timer6AIntHandler,                      // Timer 6 subtimer A
+    Timer6BIntHandler,                      // Timer 6 subtimer B
+    Timer7AIntHandler,                      // Timer 7 subtimer A
+    Timer7BIntHandler,                      // Timer 7 subtimer B
     IntDefaultHandler,                      // I2C6 Master and Slave
     IntDefaultHandler,                      // I2C7 Master and Slave
     IntDefaultHandler,                      // HIM Scan Matrix Keyboard 0
@@ -404,7 +422,7 @@ void (* const g_pfnVectors[])(void) =
 //*****************************************************************************
 //
 // The following are constructs created by the linker, indicating where the
-// the "data" and "bss" segments reside in memory.  The initializers for the
+// the "data" and "bss" segments reside in memory.  The initializers
 // for the "data" segment resides immediately following the "text" segment.
 //
 //*****************************************************************************
@@ -564,16 +582,19 @@ caddr_t _sbrk (int incr)
     }
 }
 
+__attribute__((weak))
 extern int link( char *cOld, char *cNew )
 {
     return -1 ;
 }
 
+__attribute__((weak))
 extern int _close( int file )
 {
     return -1 ;
 }
 
+__attribute__((weak))
 extern int _fstat( int file, struct stat *st )
 {
     st->st_mode = S_IFCHR ;
@@ -581,37 +602,44 @@ extern int _fstat( int file, struct stat *st )
     return 0 ;
 }
 
+__attribute__((weak))
 extern int _isatty( int file )
 {
     return 1 ;
 }
 
+__attribute__((weak))
 extern int _lseek( int file, int ptr, int dir )
 {
     return 0 ;
 }
 
+__attribute__((weak))
 extern int _read(int file, char *ptr, int len)
 {
     return 0 ;
 }
 
+__attribute__((weak))
 extern int _write( int file, char *ptr, int len )
 {
     return len;
 }
 
+__attribute__((weak))
 extern void _kill( int pid, int sig )
 {
     return ;
 }
 
+__attribute__((weak))
 extern int _getpid ( void )
 {
     return -1 ;
 }
 
 /*
+__attribute__((weak))
 extern void _exit (void)
 {
 
