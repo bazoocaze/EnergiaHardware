@@ -1,21 +1,43 @@
-/*
+/******************************************
  * CooperativeScheduler.cpp
- *
+ * Simply cooperative scheduler library.
  *  Created on: 16/11/2014
  *      Author: Bazoocaze
+ ******************************************
+ Copyright (c) 2014 Jose Ferreira
+
+ This library is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Lesser General Public License as
+ published by the Free Software Foundation, either version 3 of the
+ License, or (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library.
+ If not, see <http://www.gnu.org/licenses/>.
  */
-#include <Energia.h>
 
 #include <setjmp.h>
 
+#ifdef ENERGIA
+
+#include <Energia.h>
 #include "inc/hw_ints.h"
 #include "inc/hw_timer.h"
 #include "driverlib/rom.h"
 #include "driverlib/sysctl.h"
 #include "driverlib/timer.h"
-
-#include "Multitask.h"
 #include "utility/CooperativeScheduler.h"
+
+#else
+
+#include "CooperativeScheduler.h"
+
+#endif
 
 cmt_data_t * cmt_data = NULL;
 
@@ -24,11 +46,49 @@ cmt_data_t * cmt_data = NULL;
  * Returns true if this is an exception context, of false otherwise.
  */
 unsigned int cmt_is_eh() {
-//	unsigned int ret;
-//	/* the nine low order bits of xPSR on Cortext-M4 contains the exception number */
-//	asm ("MRS %[result], xPSR\n" : [result] "=r" (ret));
-//	return ret & 0x01FF;
+#ifdef __ARM_ARCH_7EM__
 	return HWREG(NVIC_INT_CTRL) & NVIC_INT_CTRL_VEC_ACT_M;
+#elif defined(__i386__)
+	return false;
+#else
+#error "Unsupported ARCH for Cooperative Scheduler"
+#endif
+}
+
+/*
+ * Verifies if interrupts are disable.
+ * Returns true if interrupts are disable, and false otherwise.
+ */
+unsigned int cmt_is_int_disabled() {
+#ifdef __ARM_ARCH_7EM__
+	unsigned int ret;
+	asm ("MRS %[result], PRIMASK\n" : [result] "=r" (ret));
+	return (ret & 0x01);
+#elif defined(__i386__)
+	return false;
+#else
+#error "Unsupported ARCH for Cooperative Scheduler"
+#endif
+}
+
+void cmt_disable_int() {
+#ifdef ENERGIA
+	ROM_IntMasterDisable();
+#elif defined(__i386__)
+	return;
+#else
+#error "Unsupported ARCH for Cooperative Scheduler"
+#endif
+}
+
+void cmt_enable_int() {
+#ifdef ENERGIA
+	ROM_IntMasterEnable();
+#elif defined(__i386__)
+	return;
+#else
+#error "Unsupported ARCH for Cooperative Scheduler"
+#endif
 }
 
 /*
@@ -39,9 +99,10 @@ void cmt_yeld() {
 	int next;
 	if (!cmt_data || !cmt_data->running)
 		return;
-	/* refuse to yeld if it's an exception context */
-	if (cmt_is_eh())
+	/* refuse to yeld if it's an exception context or interrupts disabled */
+	if (cmt_is_eh() || cmt_is_int_disabled())
 		return;
+	cmt_disable_int();
 	prev = cmt_data->current_task;
 	next = prev;
 	for (int n = 0; n < CMT_MAX_TASKS; n++) {
@@ -54,9 +115,10 @@ void cmt_yeld() {
 		/* no tasks left - return to calling task (MAIN)*/
 		longjmp(cmt_data->tasks[CMT_MAIN_TASK].cpu_state, 1);
 	}
-	if (setjmp(cmt_data->tasks[prev].cpu_state) != 0)
-		return;
-	longjmp(cmt_data->tasks[next].cpu_state, 1);
+	if (setjmp(cmt_data->tasks[prev].cpu_state) == 0)
+		longjmp(cmt_data->tasks[next].cpu_state, 1);
+	cmt_enable_int();
+	return;
 }
 
 /*
@@ -66,6 +128,7 @@ void cmt_yeld() {
  */
 void cmt_task_entry() {
 	int n = cmt_data->current_task;
+	cmt_enable_int();
 	cmt_data->tasks[n].entry_point();
 	/* the task terminated */
 	cmt_data->tasks[n].status = CMT_STATUS_FREE;
@@ -110,6 +173,7 @@ bool CooperativeScheduler::create_task(void (*entry)(void)) {
 		if (i == CMT_MAIN_TASK || data.tasks[i].status != CMT_STATUS_FREE)
 			continue;
 		/* initilize the task structure */
+		setjmp(data.tasks[i].cpu_state);
 		data.tasks[i].cpu_state[CMT_CPU_REG_PC] = (int) &cmt_task_entry;
 		data.tasks[i].entry_point = entry;
 		if (data.running) {
@@ -145,8 +209,8 @@ void CooperativeScheduler::run() {
 #else
 	/* determine number os tasks to run */
 	for (int i = 0; i < CMT_MAX_TASKS; i++)
-		if (data.tasks[i].status != CMT_STATUS_FREE)
-			num_tasks++;
+	if (data.tasks[i].status != CMT_STATUS_FREE)
+	num_tasks++;
 #endif
 
 	if (data.stack_size < 256)

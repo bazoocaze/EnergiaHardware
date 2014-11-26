@@ -20,9 +20,20 @@
 #define CMT_STATUS_CREATED  1
 #define CMT_STATUS_READY    2
 #define CMT_MAIN_TASK       0   /* MAIN task must be task 0 */
+
+#if defined(__ARM_ARCH_7EM__)
+
 #define CMT_CPU_REG_SP      8   /* setjmp register #8 contains SP */
 #define CMT_CPU_REG_PC      9   /* setjmp register #9 contains PC */
 
+#elif defined(__i386__)
+
+#define CMT_CPU_REG_SP      7   /* setjmp register #7 contains ESP */
+#define CMT_CPU_REG_PC      8   /* setjmp register #8 contains EIP */
+
+#else
+#error "Unsupported ARCH for Cooperative Scheduler"
+#endif
 
 typedef struct {
 	jmp_buf cpu_state;
