@@ -236,7 +236,7 @@ void CooperativeScheduler::run() {
 	/* set current task MAIN and execute first task */
 	data.current_task = CMT_MAIN_TASK;
 
-	data.running = true;
+	data.running = 1;
 	cmt_yeld();
-	data.running = false;
+	data.running = 0;
 }
